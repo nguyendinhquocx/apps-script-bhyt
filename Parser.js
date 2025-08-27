@@ -242,7 +242,12 @@ function cleanAddressFormat(rawAddress) {
   try {
     console.log('Cleaning address:', rawAddress);
     
-    // Handle special formats first
+    // Handle special nested city format first (Thủ Đức case)
+    if (rawAddress.includes('Thành phố Thủ Đức, Thành phố Hồ Chí Minh')) {
+      return cleanNestedCityFormat(rawAddress);
+    }
+    
+    // Handle special formats with semicolons
     if (rawAddress.includes(';')) {
       return cleanSemicolonFormat(rawAddress);
     }
@@ -308,6 +313,45 @@ function cleanSemicolonFormat(address) {
   
   // Build final address
   return buildFinalAddress(street, structure);
+}
+
+function cleanNestedCityFormat(rawAddress) {
+  try {
+    console.log('Cleaning nested city format:', rawAddress);
+    
+    // Split by comma to get parts
+    const parts = rawAddress.split(',').map(part => part.trim()).filter(part => part);
+    
+    if (parts.length < 4) {
+      console.warn('Expected at least 4 parts for nested city format, got:', parts.length);
+      return rawAddress;
+    }
+    
+    // Extract components
+    const street = parts[0];
+    
+    // Ward: remove "Phường" prefix
+    const wardPart = parts[1];
+    const ward = wardPart.replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '').trim();
+    
+    // District: should be "Thành phố Thủ Đức" - keep as is for proper identification
+    const districtPart = parts[2];
+    let district = districtPart.trim();
+    
+    // City: should be "Thành phố Hồ Chí Minh" - extract just "Hồ Chí Minh"
+    const cityPart = parts[3];
+    const city = cityPart.replace(/^Thành phố\s+/i, '').replace(/^Tỉnh\s+/i, '').trim();
+    
+    // For nested city format, format as: street; ward; district; city
+    const result = `${street}; ${ward}; ${district}; ${city}`;
+    
+    console.log('Nested city cleaned result:', result);
+    return result;
+    
+  } catch (error) {
+    console.error('Nested city cleaning error:', error);
+    return rawAddress; // Safe fallback
+  }
 }
 
 function smartAddressDeduplication(parts) {

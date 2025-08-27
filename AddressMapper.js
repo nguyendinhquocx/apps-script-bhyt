@@ -61,6 +61,11 @@ function parseAddressComponents(address) {
       return null; // Need at least street, ward, district
     }
     
+    // Detect nested city structure (Thủ Đức case)
+    if (isNestedCityAddress(address, parts)) {
+      return parseNestedCityAddress(parts);
+    }
+    
     // Typical format: "Street, Ward, District, City"
     const streetAddress = parts[0];
     const ward = parts[1];
@@ -76,6 +81,61 @@ function parseAddressComponents(address) {
     
   } catch (error) {
     console.error('Address parsing error:', error);
+    return null;
+  }
+}
+
+function isNestedCityAddress(address, parts) {
+  // Detect patterns like: "..., Thành phố Thủ Đức, Thành phố Hồ Chí Minh"
+  if (address.includes("Thành phố Thủ Đức, Thành phố Hồ Chí Minh")) {
+    return true;
+  }
+  
+  // More general detection for nested city structure
+  const cityCount = parts.filter(part => 
+    part.toLowerCase().includes('thành phố') ||
+    part.toLowerCase().includes('tỉnh')
+  ).length;
+  
+  return cityCount >= 2;
+}
+
+function parseNestedCityAddress(parts) {
+  try {
+    console.log('Parsing nested city address:', parts);
+    
+    // Expected format: ["Street", "Phường Ward", "Thành phố District", "Thành phố City"]
+    const streetAddress = parts[0];
+    
+    // Extract ward (remove "Phường" prefix if present)
+    const wardPart = parts[1] || '';
+    const ward = wardPart.replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '').trim();
+    
+    // For nested city, the "district" is actually the inner city (like "Thành phố Thủ Đức")
+    const districtPart = parts[2] || '';
+    let district = districtPart.replace(/^Thành phố\s+/i, '').replace(/^Tỉnh\s+/i, '').trim();
+    
+    // If district is "Thủ Đức", keep it as "Thành phố Thủ Đức" for proper mapping
+    if (district.toLowerCase() === 'thủ đức') {
+      district = 'Thành phố Thủ Đức';
+    }
+    
+    // The outer city
+    const cityPart = parts[3] || 'Thành phố Hồ Chí Minh';
+    const city = cityPart.replace(/^Thành phố\s+/i, '').replace(/^Tỉnh\s+/i, '').trim();
+    
+    const result = {
+      street: streetAddress,
+      ward: ward,
+      district: district,
+      city: city
+    };
+    
+    console.log('Nested city parse result:', result);
+    return result;
+    
+  } catch (error) {
+    console.error('Nested city parsing error:', error);
     return null;
   }
 }

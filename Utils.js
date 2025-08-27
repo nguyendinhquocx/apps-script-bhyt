@@ -67,6 +67,18 @@ function testTextParsing() {
     {
       name: "Go Vap format", 
       input: "Thông báo: Thẻ còn giá trị sử dụng! Mã thẻ: GD4797930799936, Họ tên: Đinh Tuấn Anh, Ngày sinh: 30/01/1982, Giới tính : Nam! (ĐC: 72/21 đường số 2, Phường 03, Quận Gò Vấp, Thành phố Hồ Chí Minh; Nơi KCBBĐ: 79071; Hạn thẻ: 01/09/2024 - 31/08/2025; Thời điểm đủ 5 năm liên tục: 01/08/2019)."
+    },
+    {
+      name: "Thu Duc nested city - Long Binh",
+      input: "Thông báo: Thẻ còn giá trị sử dụng! Mã thẻ: GD4797929604186, Họ tên: Nguyễn Thị Kim Dung, Năm sinh: 1964, Giới tính : Nữ! (ĐC: 81/15 KHU PHỐ VĨNH THUẬN, Phường Long Bình, Thành phố Thủ Đức, Thành phố Hồ Chí Minh; Nơi KCBBĐ: 79071; Hạn thẻ: 04/09/2024 - 03/09/2025; Thời điểm đủ 5 năm liên tục: 01/09/2019). Thẻ bảo hiểm sẽ hết hạn trong 26 ngày tới."
+    },
+    {
+      name: "Thu Duc nested city - Hiep Binh Chanh",
+      input: "Thông báo: Thẻ còn giá trị sử dụng! Mã thẻ: GD4797938369137, Họ tên: Huỳnh Quốc Huân, Ngày sinh: 27/10/1983, Giới tính : Nam! (ĐC: 97/53A ĐƯỜNG 48, Phường Hiệp Bình Chánh, Thành phố Thủ Đức, Thành phố Hồ Chí Minh; Nơi KCBBĐ: 79071; Hạn thẻ: 09/06/2025 - 31/08/2025; Thời điểm đủ 5 năm liên tục: 01/09/2022)."
+    },
+    {
+      name: "Thu Duc nested city - Thao Dien",
+      input: "Thông báo: Thẻ còn giá trị sử dụng! Mã thẻ: GD4797932109238, Họ tên: Nguyễn Thị Ngọc Phượng, Ngày sinh: 14/01/1986, Giới tính : Nữ! (ĐC: 219A NGUYỄN VĂN HưỞNG, Phường Thảo Điền, Thành phố Thủ Đức, Thành phố Hồ Chí Minh; Nơi KCBBĐ: 79071; Hạn thẻ: 01/09/2024 - 31/08/2025; Thời điểm đủ 5 năm liên tục: 01/09/2023)."
     }
   ];
   
@@ -79,7 +91,7 @@ function testTextParsing() {
         bhyt: result.bhyt,
         gender: result.gioi_tinh,
         birth: result.ngay_sinh,
-        address: result.dia_chi?.substring(0, 50) + '...'
+        address: result.dia_chi
       });
     } catch (error) {
       console.error(`❌ Parse failed for ${testCase.name}:`, error.message);
@@ -92,7 +104,11 @@ function testAddressConversion() {
   const testAddresses = [
     "13 CÁCH MẠNG THÁNG 8, Bến Thành, Quận 1, Thành phố Hồ Chí Minh",
     "72/21 đường số 2, Phường 03, Quận Gò Vấp, Thành phố Hồ Chí Minh",
-    "736/170 lê đức thọ, 15, Quận Gò Vấp, Thành phố Hồ Chí Minh"
+    "736/170 lê đức thọ, 15, Quận Gò Vấp, Thành phố Hồ Chí Minh",
+    // Test Thu Duc nested city cases
+    "81/15 KHU PHỐ VĨNH THUẬN; Long Bình; Thành phố Thủ Đức; Hồ Chí Minh",
+    "97/53A ĐƯỜNG 48; Hiệp Bình Chánh; Thành phố Thủ Đức; Hồ Chí Minh",
+    "219A NGUYỄN VĂN HưỞNG; Thảo Điền; Thành phố Thủ Đức; Hồ Chí Minh"
   ];
   
   const addressMap = loadAddressMappingData();
