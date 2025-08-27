@@ -295,8 +295,11 @@ function mapOldAddressToNew(oldAddress, mappingData) {
     const newWardName = findNewWardName(components, mappingData);
     
     if (newWardName) {
+      // Clean ward name - remove "Phường" or "Xã" prefix
+      const cleanNewWardName = newWardName.replace(/^(Phường|Xã)\s+/i, '').trim();
+      
       // Build new address: street; new_ward; city (bỏ cấp quận)
-      const newAddress = `${components.street}; ${newWardName}; ${components.city}`;
+      const newAddress = `${components.street}; ${cleanNewWardName}; ${components.city}`;
       console.log(`Address mapped: ${oldAddress} -> ${newAddress}`);
       return newAddress;
     } else {

@@ -494,3 +494,57 @@ function testNumericalWardMapping() {
     throw error;
   }
 }
+
+// Test prefix removal from ward names
+function testWardPrefixRemoval() {
+  console.log('=== Testing Ward Prefix Removal ===');
+  
+  const testAddresses = [
+    // Test Thu Duc cases that should have prefix removed
+    "81/15 KHU PHỐ VĨNH THUẬN; Long Bình; Thành phố Thủ Đức; Hồ Chí Minh",
+    "97/53A ĐƯỜNG 48; Hiệp Bình Chánh; Thành phố Thủ Đức; Hồ Chí Minh",
+    "219A NGUYỄN VĂN HưỞNG; Thảo Điền; Thành phố Thủ Đức; Hồ Chí Minh",
+    // Test regular district cases
+    "13 CÁCH MẠNG THÁNG 8; Bến Thành; 1; Hồ Chí Minh"
+  ];
+  
+  try {
+    const addressMappingData = loadAddressMappingData();
+    
+    testAddresses.forEach((address, index) => {
+      try {
+        console.log(`\nTest ${index + 1}: ${address}`);
+        
+        const originalComponents = parseOldAddress(address);
+        if (originalComponents) {
+          console.log('  Original ward:', originalComponents.ward);
+          
+          const mappedAddress = mapOldAddressToNew(address, addressMappingData);
+          console.log('  Result:', mappedAddress);
+          
+          // Check if prefix was removed
+          const resultParts = mappedAddress.split('; ');
+          if (resultParts.length >= 2) {
+            const resultWard = resultParts[1];
+            console.log('  Final ward name:', `"${resultWard}"`);
+            
+            if (resultWard.match(/^(Phường|Xã)\s+/)) {
+              console.log('  ❌ ISSUE: Prefix not removed!');
+            } else {
+              console.log('  ✅ SUCCESS: Prefix properly removed');
+            }
+          }
+        }
+        
+      } catch (error) {
+        console.error(`  ❌ Failed: ${error.message}`);
+      }
+    });
+    
+    console.log('\n=== Ward Prefix Removal Test Completed ===');
+    
+  } catch (error) {
+    console.error('❌ Ward prefix removal test setup failed:', error);
+    throw error;
+  }
+}
