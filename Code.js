@@ -22,10 +22,10 @@ function processInsuranceData() {
     
     // Load data sources
     const rawData = loadRawDataFromSheet();
-    const addressMap = loadAddressMappingData();
+    const addressMappingData = loadAddressMappingData();
     
     console.log(`Loaded ${rawData.length} raw records`);
-    console.log(`Loaded ${Object.keys(addressMap).length} address mappings`);
+    console.log(`Loaded ${addressMappingData.length} address mappings`);
     
     const processedResults = [];
     const errors = [];
@@ -34,7 +34,7 @@ function processInsuranceData() {
     rawData.forEach((record, index) => {
       try {
         const parsedInfo = parseThongTinField(record.thong_tin);
-        const transformedRecord = transformRecord(record, parsedInfo, addressMap);
+        const transformedRecord = transformRecord(record, parsedInfo, addressMappingData);
         processedResults.push(transformedRecord);
         
         // Progress indicator every 100 records
@@ -61,9 +61,9 @@ function processInsuranceData() {
     
     // Show summary
     const summary = `Xử lý hoàn thành!\n\n` +
-                   `📊 Tổng records: ${processedResults.length}\n` +
-                   `✅ Thành công: ${processedResults.length - errors.length}\n` +
-                   `❌ Lỗi: ${errors.length}`;
+                   `Tổng records: ${processedResults.length}\n` +
+                   `Thành công: ${processedResults.length - errors.length}\n` +
+                   `Lỗi: ${errors.length}`;
     
     if (errors.length > 0) {
       console.log('Processing errors:', errors);
@@ -128,35 +128,186 @@ function loadAddressMappingData() {
     if (!sheet) {
       throw new Error('Không tìm thấy sheet "xa phuong"');
     }
-    
+
     const data = sheet.getDataRange().getValues();
-    const addressMap = {};
+    console.log(`Loaded ${data.length - 1} address mapping records`);
     
-    // Skip header row, build lookup map
-    data.slice(1).forEach(row => {
+    // Return array of mapping objects for easier processing
+    return data.slice(1).map(row => {
       const [tenTinh, tenPhuongXaMoi, tenQuanHuyenCu, xaPhuongTruocSapNhap] = row;
       
-      if (tenTinh && tenPhuongXaMoi && tenQuanHuyenCu && xaPhuongTruocSapNhap) {
-        // Handle multiple old wards mapping to new ward
-        const oldWards = xaPhuongTruocSapNhap.toString().split(',');
-        
-        oldWards.forEach(oldWard => {
-          const cleanOldWard = oldWard.trim();
-          const key = `${cleanOldWard}_${tenQuanHuyenCu}_${tenTinh}`;
-          
-          addressMap[key] = {
-            phuong_moi: tenPhuongXaMoi,
-            quan_moi: '', // Removed district level in new structure
-            tinh: tenTinh
-          };
-        });
-      }
-    });
-    
-    return addressMap;
+      return {
+        tinh: tenTinh?.toString().trim() || '',
+        phuong_xa_moi: tenPhuongXaMoi?.toString().trim() || '',
+        quan_huyen_cu: tenQuanHuyenCu?.toString().trim() || '',
+        xa_phuong_truoc_sap_nhap: xaPhuongTruocSapNhap?.toString().trim() || ''
+      };
+    }).filter(item => item.tinh && item.phuong_xa_moi && item.quan_huyen_cu);
     
   } catch (error) {
+    console.error('Error loading address mapping:', error);
     throw new Error('Lỗi đọc dữ liệu mapping địa chỉ: ' + error.message);
+  }
+}
+
+function parseOldAddress(oldAddress) {
+  /**
+   * Parse địa chỉ cũ format: "13 CÁCH MẠNG THÁNG 8; Bến Thành; 1; Hồ Chí Minh"
+   * Return: {street, ward, district, city}
+   */
+  try {
+    console.log('Parsing old address:', oldAddress);
+    
+    if (!oldAddress || typeof oldAddress !== 'string') {
+      return null;
+    }
+    
+    const parts = oldAddress.split(';').map(part => part.trim()).filter(part => part);
+    
+    if (parts.length < 3) {
+      console.warn('Address has too few parts:', parts.length);
+      return null;
+    }
+    
+    const result = {
+      street: parts[0] || '',
+      ward: parts[1] || '',
+      district: parts[2] || '',
+      city: parts[3] || 'Hồ Chí Minh'
+    };
+    
+    // Normalize district - add "Quận" prefix if just number
+    if (result.district && /^\d+$/.test(result.district)) {
+      result.district = `Quận ${result.district}`;
+    }
+    
+    console.log('Parsed address components:', result);
+    return result;
+    
+  } catch (error) {
+    console.error('Error parsing old address:', error);
+    return null;
+  }
+}
+
+function findNewWardName(addressComponents, mappingData) {
+  /**
+   * Tìm tên phường mới dựa trên mapping data
+   * Input: {street, ward, district, city}, mappingData array
+   * Return: tên phường mới hoặc null
+   */
+  try {
+    if (!addressComponents || !mappingData) {
+      return null;
+    }
+    
+    const { ward, district } = addressComponents;
+    console.log(`Looking up: ward="${ward}", district="${district}"`);
+    
+    // Tìm trong mapping data
+    for (const mapping of mappingData) {
+      // Check if district matches (cần chuẩn hóa tên quận/huyện)
+      const normalizedMappingDistrict = mapping.quan_huyen_cu.replace(/^(Quận|Huyện|Thành phố)\s+/i, '').trim();
+      const normalizedCurrentDistrict = district.replace(/^(Quận|Huyện|Thành phố)\s+/i, '').trim();
+      
+      if (normalizedMappingDistrict !== normalizedCurrentDistrict) {
+        continue;
+      }
+      
+      // Check if ward is in the old ward list
+      const oldWards = mapping.xa_phuong_truoc_sap_nhap.split(',').map(w => w.trim());
+      
+      // Try multiple matching patterns for ward
+      let wardFound = false;
+      
+      for (const oldWard of oldWards) {
+        const cleanOldWard = oldWard.replace(/^(Phường|Xã)\s+/i, '').trim();
+        const cleanCurrentWard = ward.replace(/^(Phường|Xã)\s+/i, '').trim();
+        
+        // Pattern 1: Exact match
+        if (cleanOldWard === cleanCurrentWard) {
+          wardFound = true;
+          break;
+        }
+        
+        // Pattern 2: Number matching (handle "03" vs "3", "01" vs "1")
+        if (/^\d+$/.test(cleanCurrentWard) && /^\d+$/.test(cleanOldWard)) {
+          const currentNum = parseInt(cleanCurrentWard, 10);
+          const oldNum = parseInt(cleanOldWard, 10);
+          if (currentNum === oldNum) {
+            wardFound = true;
+            break;
+          }
+        }
+        
+        // Pattern 3: With "Phường" prefix
+        const wardWithPrefix = `Phường ${cleanCurrentWard}`;
+        if (oldWard.trim() === wardWithPrefix) {
+          wardFound = true;
+          break;
+        }
+        
+        // Pattern 4: Number with "Phường" prefix (handle "Phường 3" vs "03")
+        if (/^\d+$/.test(cleanCurrentWard)) {
+          const expectedWardName = `Phường ${parseInt(cleanCurrentWard, 10)}`;
+          if (oldWard.trim() === expectedWardName) {
+            wardFound = true;
+            break;
+          }
+        }
+      }
+      
+      if (wardFound) {
+        console.log(`Found mapping: ${ward} -> ${mapping.phuong_xa_moi}`);
+        return mapping.phuong_xa_moi;
+      }
+    }
+    
+    console.log(`No mapping found for ward="${ward}", district="${district}"`);
+    return null;
+    
+  } catch (error) {
+    console.error('Error finding new ward name:', error);
+    return null;
+  }
+}
+
+function mapOldAddressToNew(oldAddress, mappingData) {
+  /**
+   * Chuyển đổi địa chỉ cũ sang địa chỉ mới sau sáp nhập
+   * Input: "13 CÁCH MẠNG THÁNG 8; Bến Thành; 1; Hồ Chí Minh"
+   * Output: "13 CÁCH MẠNG THÁNG 8; Bến Thành; Hồ Chí Minh"
+   */
+  try {
+    console.log('Mapping old address to new:', oldAddress);
+    
+    if (!oldAddress || !mappingData) {
+      return oldAddress; // Fallback to original
+    }
+    
+    // Parse address components
+    const components = parseOldAddress(oldAddress);
+    if (!components) {
+      return oldAddress;
+    }
+    
+    // Find new ward name
+    const newWardName = findNewWardName(components, mappingData);
+    
+    if (newWardName) {
+      // Build new address: street; new_ward; city (bỏ cấp quận)
+      const newAddress = `${components.street}; ${newWardName}; ${components.city}`;
+      console.log(`Address mapped: ${oldAddress} -> ${newAddress}`);
+      return newAddress;
+    } else {
+      // No mapping found, return original
+      console.log('No mapping found, returning original address');
+      return oldAddress;
+    }
+    
+  } catch (error) {
+    console.error('Error mapping address:', error);
+    return oldAddress; // Safe fallback
   }
 }
 
@@ -180,7 +331,7 @@ function writeProcessedData(processedData) {
     const headers = [
       'date', 'trang thai', 'ho va ten', 'bhyt', 'gioi tinh', 
       'ngay sinh', 'dia chi', 'thoi han su dung', 'muc', 
-      'bien lai', 'cccd', 'sdt'
+      'bien lai', 'cccd', 'sdt', 'dia chi sau sap nhap'
     ];
     
     const outputData = [headers];
@@ -223,7 +374,8 @@ function createErrorRecord(originalRecord, errorMessage) {
     muc: originalRecord.muc || '',
     'bien lai': originalRecord.bien_lai || originalRecord['bien lai'] || '',
     cccd: originalRecord.cccd || '',
-    sdt: originalRecord.sdt || ''
+    sdt: originalRecord.sdt || '',
+    'dia chi sau sap nhap': '' // Thêm cột mới
   };
 }
 

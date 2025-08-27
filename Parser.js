@@ -151,7 +151,7 @@ function extractAddress(addressSection) {
   }
 }
 
-function transformRecord(rawRecord, parsedInfo, addressMap) {
+function transformRecord(rawRecord, parsedInfo, addressMappingData) {
   try {
     console.log('Transforming record for:', parsedInfo.ho_va_ten);
     
@@ -162,12 +162,15 @@ function transformRecord(rawRecord, parsedInfo, addressMap) {
       rawRecord.muc
     );
     
-    // Convert address - handle safely
-    let convertedAddress = parsedInfo.dia_chi;
+    // Keep original address from parsing
+    const originalAddress = parsedInfo.dia_chi || '';
+    
+    // Map to new address structure
+    let newAddress = originalAddress;
     try {
-      convertedAddress = convertAddress(parsedInfo.dia_chi, addressMap);
+      newAddress = mapOldAddressToNew(originalAddress, addressMappingData);
     } catch (addrError) {
-      console.warn('Address conversion failed, using original:', addrError.message);
+      console.warn('Address mapping failed, using original:', addrError.message);
     }
     
     // Build output record with proper field mapping
@@ -181,12 +184,13 @@ function transformRecord(rawRecord, parsedInfo, addressMap) {
       bhyt: parsedInfo.bhyt || '',
       'gioi tinh': parsedInfo.gioi_tinh || '',
       'ngay sinh': parsedInfo.ngay_sinh,
-      'dia chi': convertedAddress || '',
+      'dia chi': originalAddress, // Giữ địa chỉ cũ
       'thoi han su dung': thoiHanSuDung,
       muc: rawRecord.muc,
       'bien lai': rawRecord.bien_lai || rawRecord['bien lai'] || '',
       cccd: rawRecord.cccd || '',
-      sdt: rawRecord.sdt || ''
+      sdt: rawRecord.sdt || '',
+      'dia chi sau sap nhap': newAddress // Thêm cột địa chỉ mới
     };
     
     console.log('Transform successful:', result['ho va ten']);

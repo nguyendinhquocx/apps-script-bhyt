@@ -20,8 +20,12 @@ function runFullSystemTest() {
     console.log('\n=== Test 3: Address Conversion ===');
     testAddressConversion();
     
-    // Test 4: Full pipeline with sample data
-    console.log('\n=== Test 4: Full Pipeline ===');
+    // Test 4: Address mapping (NEW)
+    console.log('\n=== Test 4: Address Mapping ===');
+    testAddressMapping();
+    
+    // Test 5: Full pipeline with sample data
+    console.log('\n=== Test 5: Full Pipeline ===');
     testFullPipeline();
     
     console.log('\n✅ All tests completed successfully!');
@@ -108,15 +112,23 @@ function testAddressConversion() {
     // Test Thu Duc nested city cases
     "81/15 KHU PHỐ VĨNH THUẬN; Long Bình; Thành phố Thủ Đức; Hồ Chí Minh",
     "97/53A ĐƯỜNG 48; Hiệp Bình Chánh; Thành phố Thủ Đức; Hồ Chí Minh",
-    "219A NGUYỄN VĂN HưỞNG; Thảo Điền; Thành phố Thủ Đức; Hồ Chí Minh"
+    "219A NGUYỄN VĂN HưỞNG; Thảo Điền; Thành phố Thủ Đức; Hồ Chí Minh",
+    // Test mapping cases - format after parsing
+    "13 CÁCH MẠNG THÁNG 8; Bến Thành; 1; Hồ Chí Minh",
+    "72/21 đường số 2; 03; Gò Vấp; Hồ Chí Minh",
+    "736/170 lê đức thọ; 15; Gò Vấp; Hồ Chí Minh"
   ];
   
-  const addressMap = loadAddressMappingData();
+  const addressMappingData = loadAddressMappingData();
   
   testAddresses.forEach(address => {
     try {
-      const converted = convertAddress(address, addressMap);
-      console.log(`✅ Address converted: ${address.substring(0, 30)}... → ${converted.substring(0, 50)}...`);
+      console.log(`\nTesting address: ${address}`);
+      
+      // Test address mapping với new logic
+      const newAddress = mapOldAddressToNew(address, addressMappingData);
+      console.log(`✅ Address mapped: ${address.substring(0, 40)}... → ${newAddress.substring(0, 50)}...`);
+      
     } catch (error) {
       console.error(`❌ Address conversion failed for: ${address}`, error);
       throw error;
@@ -124,11 +136,57 @@ function testAddressConversion() {
   });
 }
 
+function testAddressMapping() {
+  console.log('\n=== Testing Address Mapping ===');
+  
+  const testAddresses = [
+    // Test các địa chỉ parsed format
+    "13 CÁCH MẠNG THÁNG 8; Bến Thành; 1; Hồ Chí Minh",
+    "72/21 đường số 2; 03; Gò Vấp; Hồ Chí Minh", 
+    "736/170 lê đức thọ; 15; Gò Vấp; Hồ Chí Minh",
+    "81/15 KHU PHỐ VĨNH THUẬN; Long Bình; Thành phố Thủ Đức; Hồ Chí Minh"
+  ];
+  
+  try {
+    const addressMappingData = loadAddressMappingData();
+    
+    testAddresses.forEach((address, index) => {
+      try {
+        console.log(`\nTest ${index + 1}: ${address}`);
+        
+        // Parse components
+        const components = parseOldAddress(address);
+        if (components) {
+          console.log('  Parsed:', components);
+          
+          // Find mapping
+          const newWardName = findNewWardName(components, addressMappingData);
+          console.log('  New ward:', newWardName || 'Not found');
+          
+          // Full mapping
+          const newAddress = mapOldAddressToNew(address, addressMappingData);
+          console.log('  Result:', newAddress);
+          console.log('  ✅ Success');
+        } else {
+          console.log('  ❌ Could not parse');
+        }
+        
+      } catch (error) {
+        console.error(`  ❌ Failed: ${error.message}`);
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Address mapping test setup failed:', error);
+    throw error;
+  }
+}
+
 function testFullPipeline() {
   try {
     // Get sample data (first 3 records)
     const rawData = loadRawDataFromSheet().slice(0, 3);
-    const addressMap = loadAddressMappingData();
+    const addressMappingData = loadAddressMappingData();
     
     console.log(`Processing ${rawData.length} sample records...`);
     
@@ -136,10 +194,14 @@ function testFullPipeline() {
     
     rawData.forEach((record, index) => {
       try {
-        const parsedInfo = parseThongTinField(record['thong tin']);
-        const transformedRecord = transformRecord(record, parsedInfo, addressMap);
+        const parsedInfo = parseThongTinField(record['thong_tin']);
+        const transformedRecord = transformRecord(record, parsedInfo, addressMappingData);
         results.push(transformedRecord);
         console.log(`✅ Record ${index + 1} processed successfully`);
+        console.log('  Address mapping result:', {
+          original: transformedRecord['dia chi'],
+          mapped: transformedRecord['dia chi sau sap nhap']
+        });
       } catch (error) {
         console.error(`❌ Record ${index + 1} failed:`, error.message);
         throw error;
@@ -215,7 +277,7 @@ function processBatchWithProgress(data, batchSize = 50) {
       const globalIndex = startIndex + recordIndex;
       try {
         // Process individual record
-        const parsedInfo = parseThongTinField(record['thong tin']);
+        const parsedInfo = parseThongTinField(record['thong_tin']);
         const addressMap = loadAddressMappingData(); // Consider caching this
         const transformedRecord = transformRecord(record, parsedInfo, addressMap);
         
@@ -377,4 +439,58 @@ function testAddressParsing() {
       console.error(`Address test ${index + 1} failed:`, error);
     }
   });
+}
+
+// Test numerical ward mapping
+function testNumericalWardMapping() {
+  console.log('=== Testing Numerical Ward Mapping ===');
+  
+  const testAddresses = [
+    // Test các phường số
+    "72/21 đường số 2; 03; Gò Vấp; Hồ Chí Minh",
+    "736/170 lê đức thọ; 15; Gò Vấp; Hồ Chí Minh",
+    "22/17 Nguyễn Hiền; 04; 3; Hồ Chí Minh",
+    "123 Main Street; 01; 1; Hồ Chí Minh",
+    "456 Test Road; 02; Tân Bình; Hồ Chí Minh"
+  ];
+  
+  try {
+    const addressMappingData = loadAddressMappingData();
+    
+    testAddresses.forEach((address, index) => {
+      try {
+        console.log(`\nTest ${index + 1}: ${address}`);
+        
+        // Parse components
+        const components = parseOldAddress(address);
+        if (components) {
+          console.log('  Parsed:', components);
+          
+          // Find mapping
+          const newWardName = findNewWardName(components, addressMappingData);
+          console.log('  New ward:', newWardName || 'Not found');
+          
+          if (newWardName) {
+            // Full mapping
+            const newAddress = mapOldAddressToNew(address, addressMappingData);
+            console.log('  Mapped to:', newAddress);
+            console.log('  ✅ Success - Found mapping');
+          } else {
+            console.log('  ⚠️ No mapping found - will keep original');
+          }
+        } else {
+          console.log('  ❌ Could not parse');
+        }
+        
+      } catch (error) {
+        console.error(`  ❌ Failed: ${error.message}`);
+      }
+    });
+    
+    console.log('\n=== Numerical Ward Mapping Test Completed ===');
+    
+  } catch (error) {
+    console.error('❌ Numerical ward mapping test setup failed:', error);
+    throw error;
+  }
 }
