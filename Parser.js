@@ -104,7 +104,7 @@ function parseThongTinField(thongTinText) {
 }
 
 function parseVietnameseDate(dateStr) {
-  if (!dateStr || !dateStr.match(/\d{2}\/\d{2}\/\d{4}/)) {
+  if (!dateStr || !dateStr.match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
     return null;
   }
   
@@ -116,7 +116,10 @@ function parseVietnameseDate(dateStr) {
     if (month < 1 || month > 12) return null;
     if (day < 1 || day > 31) return null;
     
-    return new Date(year, month - 1, day); // month is 0-indexed in JS
+    // Use Date.UTC to avoid timezone issues that can cause day shift
+    const date = new Date(Date.UTC(year, month - 1, day));
+    console.log(`Date parsed: ${dateStr} -> ${date.getUTCDate()}/${date.getUTCMonth() + 1}/${date.getUTCFullYear()}`);
+    return date;
     
   } catch (error) {
     console.error('Date parsing error:', dateStr, error);

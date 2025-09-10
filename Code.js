@@ -17,9 +17,6 @@ function processInsuranceData() {
     const ui = SpreadsheetApp.getUi();
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     
-    // Show processing message
-    ui.alert('Bắt đầu xử lý dữ liệu BHYT...');
-    
     // Load data sources
     const rawData = loadRawDataFromSheet();
     const addressMappingData = loadAddressMappingData();
