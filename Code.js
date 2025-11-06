@@ -107,7 +107,15 @@ function loadRawDataFromSheet() {
                    } else if (normalizedHeader === 'gia tien') {
                      normalizedHeader = 'gia_tien';
                    }
-                   record[normalizedHeader] = row[index];
+
+                   // Store value and normalize trang_thai field
+                   let value = row[index];
+                   if (normalizedHeader === 'trang_thai' && value) {
+                     // Trim whitespace và uppercase để chuẩn hóa GH/MM
+                     value = value.toString().trim().toUpperCase();
+                   }
+
+                   record[normalizedHeader] = value;
                  });
                  return record;
                });

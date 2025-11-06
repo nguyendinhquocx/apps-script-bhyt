@@ -176,13 +176,15 @@ function transformRecord(rawRecord, parsedInfo, addressMappingData) {
       console.warn('Address mapping failed, using original:', addrError.message);
     }
     
+    // Normalize trang_thai for display
+    const trangThaiValue = (rawRecord.trang_thai || rawRecord['trang thai'] || '').toString().trim().toUpperCase();
+    const trangThaiDisplay = trangThaiValue === 'GH' ? 'Gia hạn thẻ' :
+                             trangThaiValue === 'MM' ? 'Tăng mới' : 'Gia hạn thẻ';
+
     // Build output record with proper field mapping
     const result = {
       date: rawRecord.date,
-      'trang thai': rawRecord.trang_thai === 'GH' ? 'Gia hạn thẻ' : 
-                   rawRecord.trang_thai === 'MM' ? 'Tăng mới' : 
-                   rawRecord['trang thai'] === 'GH' ? 'Gia hạn thẻ' :
-                   rawRecord['trang thai'] === 'MM' ? 'Tăng mới' : 'Gia hạn thẻ',
+      'trang thai': trangThaiDisplay,
       'ho va ten': parsedInfo.ho_va_ten || '',
       bhyt: parsedInfo.bhyt || '',
       'gioi tinh': parsedInfo.gioi_tinh || '',
@@ -210,8 +212,11 @@ function transformRecord(rawRecord, parsedInfo, addressMappingData) {
 function calculateThoiHanSuDung(trangThai, ngayKetThuc, mucBaoHiem) {
   try {
     const cutoffDate = new Date('2025-05-03');
-    
-    if (trangThai === 'GH') { // Gia hạn thẻ
+
+    // Normalize trangThai: trim whitespace và uppercase
+    const normalizedTrangThai = trangThai ? trangThai.toString().trim().toUpperCase() : '';
+
+    if (normalizedTrangThai === 'GH') { // Gia hạn thẻ
       if (ngayKetThuc && ngayKetThuc > cutoffDate) {
         // Add 1 day to end date
         return new Date(ngayKetThuc.getTime() + 24 * 60 * 60 * 1000);
@@ -224,7 +229,7 @@ function calculateThoiHanSuDung(trangThai, ngayKetThuc, mucBaoHiem) {
       newDate.setMonth(newDate.getMonth() + 1);
       return newDate;
     }
-    
+
   } catch (error) {
     console.error('Date calculation error:', error);
     return new Date('2025-05-03'); // Fallback date
